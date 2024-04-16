@@ -831,27 +831,32 @@ static void interppv(const insstate_t *ins,double dt,double *pe, double *ve,
 #if NOINTERP
     t=1.0; dt=0.0;
 #endif
-    if (fabs(tt)<1E-6) {
+    if (fabs(tt)<1E-6)
+    {
         matcpy(pe,ins->re,1,3); matcpy(ve ,ins->ve ,1,3);
         matcpy(ae,ins->ae,1,3); matcpy(Cbe,ins->Cbe,3,3);
         return;
     }
-    for (i=0;i<3;i++) {
+
+    // 根据上次更新的位置速度加速度差分推算当前时间的位置速度加速度
+    for (i=0;i<3;i++) 
+    {
         pe[i]=ins->re[i]+(ins->re[i]-ins->pins[i  ])/tt*dt;
         ve[i]=ins->ve[i]+(ins->ve[i]-ins->pins[i+3])/tt*dt;
         ae[i]=ins->ae[i]+(ins->ae[i]-ins->pins[i+6])/tt*dt;
     }
+
     /* attitude-quaternion of current time */
-    dcm2rpy(ins->pCbe,rpy);
-    rpy2quat(rpy,&q1);
+    dcm2rpy(ins->pCbe,rpy);     // 上个状态旋转矩阵转到欧拉角
+    rpy2quat(rpy,&q1);          // 上个状态欧拉角转四元素
     
     /* attitude-quaternion of precious time */
-    dcm2rpy(ins->Cbe,rpy);
-    rpy2quat(rpy,&q2);
+    dcm2rpy(ins->Cbe,rpy);  // 当前imu欧拉角
+    rpy2quat(rpy,&q2);      // 当前imu四元素
 
     /* interpolate ins attitude by quaternion */
-    quat_slerp(&q,&q1,&q2,t);
-    quat_to_rh_rot_matrix(&q,Cbe);
+    quat_slerp(&q,&q1,&q2,t); // 四元素外推
+    quat_to_rh_rot_matrix(&q,Cbe); // 四元素推到目标时间的旋转矩阵
 }
 /* copy ins parameters for backup--------------------------------------------*/
 static void prepara(const insstate_t *ins,double *fib,double *omgb,double *Mg,
@@ -1004,57 +1009,60 @@ static int lcfilt(const insopt_t *opt, insstate_t *ins, const double *meas,
         return 0;
     }
     /* interpolate ins states: attitude,position and velocity */
-    interppv(ins,dt,re,ve,ae,Cbe);
+    interppv(ins,dt,re,ve,ae,Cbe); // 内插imu结果到GNSS时间
 
-    prepara(ins,fib,omgb,Mgc,Mac,Gg,bac,bgc,leverc);
+    prepara(ins,fib,omgb,Mgc,Mac,Gg,bac,bgc,leverc); // 复制备份
 
     /* build H,v and R matrix from input measurements */
     H=zeros(NM,nx); v=zeros(NM,1);
     R=zeros(NM,NM);
 
-    if ((nm=build_HVR(opt,NULL,Cbe,leverc,omgb,fib,meas,
-                      re,ve,ae,std,cov,P,H,v,R))) {
-        if (cov) {
+    if ((nm=build_HVR(opt,NULL,Cbe,leverc,omgb,fib,meas, re,ve,ae,std,cov,P,H,v,R)))
+    {
+        if (cov)
+        {
             for (i=0;i<NM;i++) stde[i]=cov[i+i*NM];
         }
-        else {
+        else
+        {
             matcpy(stde,std,1,NM);
         }
         /* disable gyro/accl/att state if measurement is bad */
-        if (norm(stde,NM)>=MAXVARDIS) {
+        if (norm(stde,NM)>=MAXVARDIS)
+        {
             for (i=IA ;i<IA+NA  ;i++) unusex(opt,i,ins,x);
             for (i=iba;i<iba+nba;i++) unusex(opt,i,ins,x);
             for (i=ibg;i<ibg+nbg;i++) unusex(opt,i,ins,x);
         }
         /* ekf filter */
-        if ((info=filter(x,P,H,v,R,nx,nm))) {
+        if ((info=filter(x,P,H,v,R,nx,nm)))
+        {
             trace(2,"filter error (info=%d)\n",info);
             free(H); free(v); free(R);
             return 0;
         }
     }
-    else {
+    else
+    {
         trace(3,"no gnss position and velocity measurement\n");
         free(H); free(v); free(R);
         return 0;
     }
     /* close-loop for estimated states */
-    lcclp(x,Cbe,re,ve,fib,omgb,Gg,rec,vec,aec,bac,bgc,Mac,Mgc,
-          leverc,Cbec,fibc,omgbc,opt);
+    lcclp(x,Cbe,re,ve,fib,omgb,Gg,rec,vec,aec,bac,bgc,Mac,Mgc, leverc,Cbec,fibc,omgbc,opt);
 
     /* post-fit residuals for ins-gnss coupled */
-    if ((nm=build_HVR(opt,NULL,Cbec,leverc,omgbc,fibc,meas,
-                      rec,vec,aec,std,cov,P,H,v,R))) {
-
+    if ((nm=build_HVR(opt,NULL,Cbec,leverc,omgbc,fibc,meas, rec,vec,aec,std,cov,P,H,v,R)))
+    {
         /* validation of solutions */
-        if ((stat=valsol(x,P,R,v,nm,10.0))) {
-            
+        if ((stat=valsol(x,P,R,v,nm,10.0)))
+        {
             /* updates ins states */
-            updinss(ins,rec,vec,Cbec,fibc,omgbc,bac,bgc,
-                    Mgc,Mac,leverc);
+            updinss(ins,rec,vec,Cbec,fibc,omgbc,bac,bgc, Mgc,Mac,leverc);
         }
     }
-    else {
+    else
+    {
         stat=0; /* update fail */
     }
     free(H); free(v); free(R);
