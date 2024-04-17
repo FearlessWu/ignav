@@ -806,15 +806,15 @@ extern void rmlever(const double *pos, const double *re, const double *ve,
     trace(3,"rmlever :\n");
 
     /* correct position */
-    matmul3v("N",Cbe,lever,T);
-    if (rec) for (i=0;i<3;i++) rec[i]=re[i]+T[i];
+    matmul3v("N",Cbe,lever,T); // T = Cbe * lever, ecef frame下的杆臂补偿
+    if (rec) for (i=0;i<3;i++) rec[i]=re[i]+T[i]; // IMU测量的GNSS天线位置
 
     /* correct velecity */
-    skewsym3(omgb,Omg);
-    matmul3v("N",Omg,lever,wl);
-    matmul3v("N",Cbe,wl,T);
-    matmul33("NNN",Omge,Cbe,lever,3,3,3,1,wl);
-    if (vec) for (i=0;i<3;i++) vec[i]=ve[i]+T[i]-wl[i];
+    skewsym3(omgb,Omg);  // 反对称矩阵 Omg = omgb^x
+    matmul3v("N",Omg,lever,wl);                             // wl = Omg * lever, 杆臂补偿对速度的影响
+    matmul3v("N",Cbe,wl,T);                                 // T = Cbe * wl
+    matmul33("NNN",Omge,Cbe,lever,3,3,3,1,wl);              // wl = Omge * Cbe * lever, Omge=地球自转
+    if (vec) for (i=0;i<3;i++) vec[i]=ve[i]+T[i]-wl[i];     // vec = ve + T - wl
 }
 /* coning and sculling compensation------------------------------------------
  * args    :  double *gyro      I  gyro angular increments

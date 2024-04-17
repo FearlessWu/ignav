@@ -569,7 +569,8 @@ static void jacobian_prot_pang(const double *Cbe,double *S)
 static void jacobian_p_att(const double *Cbe,const double *lever,double *dpdatt)
 {
     double cl[3];
-    matmul3v("N",Cbe,lever,cl); skewsym3(cl,dpdatt);
+    matmul3v("N",Cbe,lever,cl);
+    skewsym3(cl,dpdatt);
 }
 /* jacobian of position measurement by ins-gnss time synchronization error---*/
 static void jacobian_p_dt(const double *omgb,const double *lever,const double *Cbe,
@@ -580,7 +581,10 @@ static void jacobian_p_dt(const double *omgb,const double *lever,const double *C
     skewsym3(omgb,wl);
     matmul3v("N",wl,lever,cl);
     matmul3v("N",Cbe,cl,dpddt);
-    for (i=0;i<3;i++) dpddt[i]+=ve[i];
+    for (i=0;i<3;i++)
+    {
+        dpddt[i]+=ve[i];
+    }
 }
 /* jacobian of velocity measurement by attitude error term ------------------*/
 static void jacobian_v_att(const double *Cbe,const double *lever,
@@ -688,11 +692,11 @@ static int build_HVR(const insopt_t *opt,const double *pos,const double *Cbe,
     trace(3,"build_HVR:\n");
 
     /* remove lever-arm effects */
-    rmlever(NULL,re,ve,lever,Cbe,omgb,re_,ve_);
+    rmlever(NULL,re,ve,lever,Cbe,omgb,re_,ve_); // 杆臂补偿
 
     /* for position measurement */
-    jacobian_p_att(Cbe,lever,r1);
-    jacobian_p_dt (omgb,lever,Cbe,ve,dt1);
+    jacobian_p_att(Cbe,lever,r1);           // 杆臂误差
+    jacobian_p_dt (omgb,lever,Cbe,ve,dt1);  // 递推误差
 
 #if UPD_IN_EULER
     /* jacobian of perturb rotation wrt. perturb euler angle */
@@ -701,12 +705,16 @@ static int build_HVR(const insopt_t *opt,const double *pos,const double *Cbe,
     matcpy(r1p,r1,3,3);
     matmul("NN",3,3,3,1.0,r1p,S,0.0,r1);
 #endif
-    for (i=IMP;i<IMP+NMP;i++) {
-        if (meas[i]!=0.0) {
-            if (fabs(v[nm]=(meas[i]-re_[i-IMP]))>=MAXINOP) {
+    for (i = IMP; i < IMP + NMP; i++)
+    {
+        if (meas[i]!=0.0) 
+        {
+            if (fabs(v[nm]=(meas[i]-re_[i-IMP]))>=MAXINOP)
+            {
                 trace(2,"too large innovations for position\n");
             }
-            if (H) {
+            if (H)
+            {
                 for (j=IA; j<IA+NA;  j++) H[j+nm*nx]= r1 [i-IMP+(j-IA)*3];
                 for (j=IP; j<IP+NP;  j++) H[j+nm*nx]=-I  [i-IMP+(j-IP)*3];
                 for (j=idt;j<idt+ndt;j++) H[j+nm*nx]= dt1[i-IMP];
@@ -937,36 +945,44 @@ extern void lcclp(double *x,double *Cbe,double *re,double *ve,double *fib,
     rec[2]=re[2]-x[IP+2];
 
     /* accl and gyro bias correction */
-    if (nba&&x[iba]!=DISFLAG) {
+    if (nba&&x[iba]!=DISFLAG)
+    {
         bac[0]+=x[iba]; bac[1]+=x[iba+1]; bac[2]+=x[iba+2];
     }
-    if (nbg&&x[ibg]!=DISFLAG) {
+    if (nbg&&x[ibg]!=DISFLAG) 
+    {
         bgc[0]+=x[ibg]; bgc[1]+=x[ibg+1]; bgc[2]+=x[ibg+2];
     }
     /* residual scale factors of gyroscopes and accl correction */
-    if (nsg&&x[isg]!=DISFLAG) {
+    if (nsg&&x[isg]!=DISFLAG) 
+    {
         for (i=isg;i<isg+nsg;i++) Mgc[i-isg+(i-isg)*3]+=x[i];
     }
-    if (nsa&&x[isa]!=DISFLAG) {
+    if (nsa&&x[isa]!=DISFLAG)
+    {
         for (i=isa;i<isa+nsa;i++) Mac[i-isa+(i-isa)*3]+=x[i];
     }
     /* correction non-orthogonal between sensor axes */
-    if (opt->estrg&&x[irg]!=DISFLAG) {
+    if (opt->estrg&&x[irg]!=DISFLAG)
+    {
         Mgc[3]+=x[irg  ]; Mgc[6]+=x[irg+1]; Mgc[1]+=x[irg+2];
         Mgc[7]+=x[irg+3]; Mgc[2]+=x[irg+4]; Mgc[5]+=x[irg+5];
     }
-    if (opt->estra&&x[ira]!=DISFLAG) {
+    if (opt->estra&&x[ira]!=DISFLAG)
+    {
         Mac[3]+=x[ira  ]; Mac[6]+=x[ira+1]; Mac[1]+=x[ira+2];
         Mac[7]+=x[ira+3]; Mac[2]+=x[ira+4]; Mac[5]+=x[ira+5];
     }
     /* correction for lever arm */
-    if (nla&&x[ila]!=DISFLAG) {
+    if (nla&&x[ila]!=DISFLAG)
+    {
         leverc[0]+=x[ila+0];
         leverc[1]+=x[ila+1];
         leverc[2]+=x[ila+2];
     }
     /* correction imu accl and gyro measurements */
-    if (fib&&omgb&&fibc&&omgbc&&Gg) {
+    if (fib&&omgb&&fibc&&omgbc&&Gg)
+    {
         ins_errmodel2(fib,omgb,Mac,Mgc,bac,bgc,Gg,fibc,omgbc);
 
         /* correction imu-body accelerometer */
